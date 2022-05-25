@@ -10,21 +10,39 @@
 #include <ctype.h>	         /* toupper */
 #include <signal.h>          /* signal */
 #include <pthread.h>         /* For threads */
+#include <string.h>
 
 #include "ADTVector.h"
+#include "pool.h"
 
-//vector_create(10,NULL);
-
+#define perror2(s,e) fprintf(stderr, "%s: %s\n", s, strerror(e))
 
 void perror_exit(char *message);
 void sigchld_handler (int sig);
-void *communication_thread(void *argp){ /* Thread function */
-    printf("I am the newly created communication-thread %ld\n", pthread_self());
-    // ????????????
-    // pthread_exit((void *) 47);
+
+//vector_create(10,NULL);
+
+void read_what_the_client_send(){
+
 }
 
-main(int argc, char *argv[]){
+void push_the_file_in_the_queue(){
+
+}
+
+
+void *communication_thread(void *argp){ /* Thread function */ 
+    printf("I am the newly created communication-thread %ld\n", pthread_self());
+    // ????????????
+
+    read_what_the_client_send();
+    push_the_file_in_the_queue();
+}
+
+pthread_mutex_t mtx;
+
+
+int main(int argc, char *argv[]){
     
     int port, sock, newsock;
     int thread_pool_size=0, queue_size=0, block_size=0;
@@ -42,18 +60,23 @@ main(int argc, char *argv[]){
         printf("Worng arguments\n");
         exit(1);
     }
+    printf("Server’s parameters are:\n");
     for (int i = 0; i < argc; i++){
         if (strcmp(argv[i], "-p") == 0){
             port = atoi(argv[i + 1]);
+            printf("port: %d\n", port);
         }
         if (strcmp(argv[i], "-s") == 0){
             thread_pool_size = atoi(argv[i + 1]);
+            printf("thread pool size: %d\n", thread_pool_size);
         }
         if (strcmp(argv[i], "-q") == 0){
             queue_size = atoi(argv[i + 1]);
+            printf("queue size: %d\n",queue_size);
         }
         if (strcmp(argv[i], "-b") == 0){
             block_size = atoi(argv[i + 1]);
+            printf("block size: %d\n", block_size);
         }
     }
     // Reap dead children asynchronously
@@ -76,20 +99,20 @@ main(int argc, char *argv[]){
         // accept connection
     	if ((newsock = accept(sock, clientptr, &clientlen)) < 0) 
             perror_exit("accept");
-    	printf("Accepted connection\n");
-    	// making the thread
-        if (err = pthread_create(&thr, NULL, communication_thread, NULL)) { /* New thread */
-            perror2("pthread_create", err);
-            exit(1);
-        }
+    	printf("Accepted connection from localhost\n");
+    	// making the communication thread
+        // if (err = pthread_create(&thr, NULL, communication_thread, NULL)) { /* New thread */
+        //     perror2("pthread_create", err);
+        //     exit(1);
+        // }
 
 
 
 
-    	close(newsock); //------- parent closes socket to client
+    	//close(newsock); //------- parent closes socket to client
     }
 
-
+    return 0;
 }
 
 
