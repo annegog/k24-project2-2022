@@ -32,18 +32,22 @@ main(int argc, char *argv[]){
         printf("Worng arguments\n");
         exit(1);
     }
+    printf("Client’s parameters are:\n");
     for (int i = 0; i < argc; i++){
         if (strcmp(argv[i], "-i") == 0){
             // Find server address
             if ((rem = gethostbyname(argv[i+1])) == NULL) {	
 	        herror("gethostbyname"); exit(1);
-            }   
+            }
+            printf("serverIP: %s\n", rem->h_name);
         }
         if (strcmp(argv[i], "-p") == 0){
             port = atoi(argv[i + 1]);
+            printf("port: %d\n", port);
         }
         if (strcmp(argv[i], "-d") == 0){
             directory = argv[i + 1];
+            printf("directory: %s\n", directory);
         }
     }
 
@@ -53,14 +57,18 @@ main(int argc, char *argv[]){
     /* Initiate connection */
     if (connect(sock, serverptr, sizeof(server)) < 0)
 	   perror_exit("connect");
-    printf("Connecting to %s port %d\n", rem->h_addrtype, port);
+    printf("Connecting to %s port %d\n", rem->h_name, port);
 
     strcpy(buf,directory);
-    // write the path we want to copy on client's file system
-    if (write(sock,buf, BUFF) < 0)
-        perror_exit("write");
+    while (1){
     
-	
+        // write the path we want to copy on client's file system
+        if (write(sock,buf, BUFF) < 0)
+            perror_exit("write");
+    
+
+    }
+
 
 
 }
