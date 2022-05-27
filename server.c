@@ -20,12 +20,17 @@
 
 #define perror2(s,e) fprintf(stderr, "%s: %s\n", s, strerror(e))
 
+/***************************************************************************************/
+
 pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cvar;                                             /* Condition variable */
 
+/***************************************************************************************/
 
 void perror_exit(char *message);
 void sigchld_handler (int sig);
+    
+/***************************************************************************************/
 
 void *communication_thread(void *argp){ /* Thread function */
     printf("I am the newly created communication thread %ld\n", pthread_self());
@@ -46,6 +51,8 @@ void *communication_thread(void *argp){ /* Thread function */
     free(argp);
     pthread_exit(NULL);
 }
+
+/***************************************************************************************/
 
 void *worker_thread(void *arg){
     int err;
@@ -71,6 +78,8 @@ void *worker_thread(void *arg){
     pthread_exit(NULL);
 }
 
+/***************************************************************************************/
+
 
 int main(int argc, char *argv[]){
     
@@ -86,8 +95,10 @@ int main(int argc, char *argv[]){
     pthread_t thr_com, thr_work;
     int err, status;
 
-    pthread_cond_init(&cvar, NULL);             /* Initialize condition variable */
-
+    pthread_cond_init(&cvar, NULL); // initialize condition variable
+    
+    /******************************** arguments ********************************************/
+    
     if (argc != 9){
         // ./dataServer -p <port> -s <thread_pool_size> -q <queue_size> -b <block_size>
         printf("Worng arguments\n");
@@ -112,13 +123,14 @@ int main(int argc, char *argv[]){
             printf("block size: %d\n", block_size);
         }
     }
+
     // Reap dead children asynchronously
     signal(SIGCHLD, sigchld_handler);
 
     // create the deque of files
     Deque queue_of_files = deque_create(queue_size,NULL);
 
-    /******************************** create the worker threads **********************************************/
+    /************************** create the worker threads **********************************/
     
     // make a pool- array for the worker threads
     pthread_t * pool_threads_array;
@@ -153,18 +165,22 @@ int main(int argc, char *argv[]){
     server.sin_family = AF_INET;       /* Internet domain */
     server.sin_addr.s_addr = htonl(INADDR_ANY);
     server.sin_port = htons(port);      /* The given port */
+
     /* Bind socket to address */
     //printf("Bind socket to address\n");
     if (bind(sock, serverptr, sizeof(server)) < 0)
         perror_exit("bind");
     /* Listen for connections */
-    if (listen(sock, 200) < 0) perror_exit("listen");
+    if (listen(sock, 200) < 0) 
+        perror_exit("listen");
     printf("Listening for connections to port %d\n", port);
     while(1){ 
         clientlen = sizeof(client);
     	if ((newsock = accept(sock, clientptr, &clientlen)) < 0) 
             perror_exit("accept");
     	printf("Accepted connection from localhost\n");
+        
+        /************************* making the communication thread *************************/
         
         int* pr_new = malloc(sizeof(int));
         *pr_new= newsock;
@@ -174,8 +190,10 @@ int main(int argc, char *argv[]){
         }
     	//close(newsock); //------- parent closes socket to client
     }
-
-    // delete the com=thread
+    
+    /***************************************************************************************/
+    
+    // delete the com-thread
     if (err = pthread_join(thr_com, (void **) &status)) { /* Wait for thread */
         perror2("pthread_join", err); /* termination */
         exit(1);
