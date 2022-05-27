@@ -14,7 +14,6 @@
 
 #include "ADTDeque.h"
 #include "ADTDeque.c"
-#include "pool.h"
 
 #define BUFF 4096
 
