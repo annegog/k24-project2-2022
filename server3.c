@@ -11,9 +11,8 @@
 #include <signal.h>          /* signal */
 #include <pthread.h>         /* For threads */
 #include <string.h>
-
-#include "ADTDeque.h"
-#include "ADTDeque.c"
+#include <dirent.h>
+#include <sys/stat.h>
 
 #define BUFF 4096
 
@@ -21,59 +20,138 @@
 
 /***************************************************************************************/
 
-pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cvar;                                             /* Condition variable */
 
 /***************************************************************************************/
 
 void perror_exit(char *message);
 void sigchld_handler (int sig);
-    
+
+/***************************************************************************************/
+struct thread_args {
+    int f_socket;
+    int s_size;
+};
 /***************************************************************************************/
 
-void *communication_thread(void *argp){ /* Thread function */
-    printf("I am the newly created communication thread %ld\n", pthread_self());
-    int sock = *(int*)argp;
-    char buff[BUFF];
 
-    if(read(sock, buff, BUFF) < 0){
-        perror_exit("read");
-    }   
-    printf("I read: %s\n", buff);
+typedef struct {
+        char* data[BUFF];
+        int start;
+        int end;
+        int count;
+} queue_t;
 
+
+pthread_mutex_t mtx;
+pthread_cond_t cond_nonempty;
+pthread_cond_t cond_nonfull;
+
+queue_t oyra;
+
+void initialize(queue_t *oyra) {
+    oyra->start = 0;
+    oyra->end = -1;
+    oyra->count = 0;
+}
+
+void place(queue_t *oyra, char* data, int size) {
+    pthread_mutex_lock(&mtx);
+    while (oyra->count >= size){
+        printf(">>Buffer Full \n");
+        pthread_cond_wait(&cond_nonfull, &mtx);
+    }
+    oyra->end = (oyra->end + 1) % size;
+    oyra->data[oyra->end] = data;
+    printf("AAAAAAAAAAAAA\n");
+    oyra->count++;
+    pthread_mutex_unlock(&mtx);
+}
+
+char* obtain(queue_t * oyra, int size) {
+    char* data;
+    pthread_mutex_lock(&mtx);
+    while (oyra->count <= 0) {
+        printf(">>Buffer Empty \n");
+        pthread_cond_wait(&cond_nonempty, &mtx);
+    }
+    printf("aaaaaaaaaa\n");
+    data = oyra->data[oyra->start];
+    oyra->start = (oyra->start + 1) % size;
+    oyra->count--;
+    pthread_mutex_unlock(&mtx);
+    return data;
+}
+
+/***************************************************************************************/
+int pos = 0;
+
+
+int find_the_files(char* file, pthread_t thread, int max_size){
+    DIR *folder;
+    struct dirent *entry;
+    char new_file[BUFF];
+    folder = opendir(file);
+    if(folder == NULL){
+        perror("Unable to read directory");
+        return(1);
+    }
+    while( (entry=readdir(folder)) ){
+        if (entry->d_type == DT_DIR){
+            if( !(strcmp(entry->d_name,".") == 0 || strcmp(entry->d_name,"..") == 0) ){
+                sprintf(new_file, "%s/%s", file, entry->d_name );
+                find_the_files(new_file,thread,max_size);
+            }
+        }
+        else{
+            pos++;
+            sprintf(new_file, "%s/%s", file, entry->d_name);
+            place(&oyra,new_file,max_size);
+            printf("[Thread %ld]: Adding file <%s> to the queue…\n", thread, new_file);
+           
+            //assert(deque_get_at(queue, pos) == new_file);
+        }
+        pos = 0;
+    }
+    closedir(folder);    
+    printf("HEEEEELLOOOO\n");
+    return 0;
+}
+
+/****************************** communication thread ***************************************/
+
+void *communication_thread(void *argp){ 
+    //printf("I am the newly created communication thread %ld\n", pthread_self());
+    char buff[BUFF];    
+    struct thread_args *args = (struct thread_args *) argp;
     // να διβάσει το path που εστειλε ο client
-   
-    //deque_insert_first(deque, a);
-    // να βάλει το αρχελιο στην ουρά
+    if(read(args->f_socket, buff, BUFF) < 0){
+        perror_exit("read");
+    }
+    // να βάλει το αρχειο στην ουρά
     // αν η ουρά ειναι γεμάτη περιμένει
-
+    
+    printf("[Thread %ld]: About to scan the directory %s\n", pthread_self(), buff);
+    find_the_files(buff,pthread_self(),args->s_size);
+    printf("ela\n");
+    pthread_cond_signal(&cond_nonempty);
+    
     free(argp);
     pthread_exit(NULL);
 }
 
-/***************************************************************************************/
+/***************************************** worker thread ***********************************/
 
 void *worker_thread(void *arg){
-    int err;
-
     printf("Just created a worker thread %ld\n", pthread_self());
-    //printf("Thread %ld: Waiting for signal\n", pthread_self());
-    pthread_cond_wait(&cvar, &mtx); //* Wait for signal
-
-    if (err = pthread_mutex_lock(&mtx)) {            /* Lock mutex */
-        perror2("pthread_mutex_lock", err); exit(1); }
-    printf("AAA Thread %ld: Locked the mutex\n", pthread_self());
-
-    // META
-    // gia na to bgalw apo to wait
-    /* Wake up one thread waiting for condition variable COND.  */
-    pthread_cond_signal(&cvar);                          /* Awake thread */
-    printf("Thread %ld: Sent signal\n", pthread_self());
-
-    if (err = pthread_mutex_unlock(&mtx)) {                  /* Unlock mutex */
-        perror2("pthread_mutex_unlock", err); exit(1); }
-    printf("Thread %ld: Unlocked the mutex\n", pthread_self());
-
+    
+    struct thread_args *args = (struct thread_args *) arg;
+    printf("hey!!!\n");
+    while (oyra.count > 0) {
+        printf("consumer: %s\n", obtain(&oyra,args->s_size));
+        pthread_cond_signal(&cond_nonfull);
+    }
+    
     pthread_exit(NULL);
 }
 
@@ -95,7 +173,12 @@ int main(int argc, char *argv[]){
     int err, status;
 
     pthread_cond_init(&cvar, NULL); // initialize condition variable
-    
+
+    initialize(&oyra);
+    pthread_mutex_init(&mtx, 0);
+    pthread_cond_init(&cond_nonempty, 0);
+    pthread_cond_init(&cond_nonfull, 0);
+
     /******************************** arguments ********************************************/
     
     if (argc != 9){
@@ -119,15 +202,16 @@ int main(int argc, char *argv[]){
         }
         if (strcmp(argv[i], "-b") == 0){
             block_size = atoi(argv[i + 1]);
-            printf("block size: %d\n", block_size);
+            printf("block size: %d\n\n", block_size);
         }
     }
 
     // Reap dead children asynchronously
     signal(SIGCHLD, sigchld_handler);
-
-    // create the deque of files
-    Deque queue_of_files = deque_create(queue_size,NULL);
+    
+    struct thread_args *args = malloc (sizeof (struct thread_args));
+    args->f_socket = newsock;
+    args->s_size = queue_size;
 
     /************************** create the worker threads **********************************/
     
@@ -136,12 +220,7 @@ int main(int argc, char *argv[]){
     pool_threads_array = malloc (sizeof(pthread_t) * thread_pool_size);
     
     for(pthread_t i=0; i<thread_pool_size; i++){
-        // Lock mutex
-        if (err = pthread_mutex_lock(&mtx)){                           
-            perror2("pthread_mutex_lock", err); exit(1); }
-        //printf("Thread %ld: Locked the mutex\n", pthread_self());
-
-        if (err = pthread_create(&thr_work, NULL, worker_thread, NULL)){
+        if (err = pthread_create(&thr_work, NULL, worker_thread, args)){
             perror2("pthread_create", err);
             exit(1);
         }
@@ -149,16 +228,11 @@ int main(int argc, char *argv[]){
 
         pool_threads_array[i]= thr_work;
 
-        // Unlock mutex
-        if (pthread_mutex_unlock(&mtx)) {                     
-            perror("pthread_mutex_unlock"); exit(1); }
-        //printf("Thread %ld: Unlocked the mutex\n", pthread_self());
     }
 
     /***************************************************************************************/
-
     // Create socket
-    //printf("create socket\n");
+    // printf("create socket\n");
     if ((sock = socket(PF_INET, SOCK_STREAM, 0)) < 0)
         perror_exit("socket");
     server.sin_family = AF_INET;       /* Internet domain */
@@ -173,7 +247,7 @@ int main(int argc, char *argv[]){
     if (listen(sock, 200) < 0) 
         perror_exit("listen");
     printf("Listening for connections to port %d\n", port);
-    while(1){ 
+    while(1){
         clientlen = sizeof(client);
     	if ((newsock = accept(sock, clientptr, &clientlen)) < 0) 
             perror_exit("accept");
@@ -181,12 +255,15 @@ int main(int argc, char *argv[]){
         
         /************************* making the communication thread *************************/
         
-        int* pr_new = malloc(sizeof(int));
-        *pr_new= newsock;
-        if (err = pthread_create(&thr_com, NULL, communication_thread, pr_new)){
+        args->f_socket = newsock;
+        args->s_size = queue_size;
+
+        if (err = pthread_create(&thr_com, NULL, communication_thread, args)){
             perror2("pthread_create", err);
             exit(1);
         }
+        printf("Thread %ld: Created thread %ld\n", pthread_self(), thr_com);
+
     	//close(newsock); //------- parent closes socket to client
     }
     
@@ -201,6 +278,10 @@ int main(int argc, char *argv[]){
     pthread_exit(NULL);
 
     free(pool_threads_array);
+    pthread_cond_destroy(&cond_nonempty);
+    pthread_cond_destroy(&cond_nonfull);
+    pthread_mutex_destroy(&mtx);
+    
     return 0;
 }
 
