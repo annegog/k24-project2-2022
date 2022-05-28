@@ -136,7 +136,7 @@ int place_the_files(char* file, pthread_t thread, int max_size){
             printf("[Thread %ld]: Adding file <%s>to the queue…\n", thread, new_file);
             num_of_files--;
             pthread_cond_signal(&cond_nonempty);
-            usleep(300000);
+            //usleep(300000);
 
         }
     }
