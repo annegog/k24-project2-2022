@@ -20,7 +20,12 @@
 
 /***************************************************************************************/
 
-pthread_cond_t cvar;                                             /* Condition variable */
+pthread_mutex_t mtx;
+pthread_mutex_t mtx_2;
+pthread_mutex_t mtx_3;
+pthread_cond_t cond_nonempty;
+pthread_cond_t cond_nonfull;
+pthread_cond_t cvar;
 
 /***************************************************************************************/
 
@@ -42,11 +47,6 @@ typedef struct {
         int count;
 } queue_t;
 
-
-pthread_mutex_t mtx;
-pthread_cond_t cond_nonempty;
-pthread_cond_t cond_nonfull;
-
 queue_t oyra;
 
 void initialize(queue_t *oyra) {
@@ -58,28 +58,30 @@ void initialize(queue_t *oyra) {
 void place(queue_t *oyra, char* data, int size) {
     pthread_mutex_lock(&mtx);
     while (oyra->count >= size){
-        printf(">>Buffer Full \n");
+        printf(">>Buffer Full!\tI'm waiting a work thread to take a file from the queue\n");
+        pthread_cond_signal(&cvar);
         pthread_cond_wait(&cond_nonfull, &mtx);
     }
     oyra->end = (oyra->end + 1) % size;
     oyra->data[oyra->end] = data;
-    printf("AAAAAAAAAAAAA\n");
     oyra->count++;
+    printf("here- I just place a file <%s> in the oyra.\n", data);
     pthread_mutex_unlock(&mtx);
 }
 
 char* obtain(queue_t * oyra, int size) {
     char* data;
-    pthread_mutex_lock(&mtx);
+    pthread_mutex_lock(&mtx_3);
+    printf("aaaaa\n");
     while (oyra->count <= 0) {
-        printf(">>Buffer Empty \n");
-        pthread_cond_wait(&cond_nonempty, &mtx);
+        printf(">>Buffer Empty!\tI'm waiting the com-thread to push a file in the queue\n");
+        pthread_cond_wait(&cond_nonempty, &mtx_3);
     }
-    printf("aaaaaaaaaa\n");
     data = oyra->data[oyra->start];
     oyra->start = (oyra->start + 1) % size;
+    printf("Here- I just took a file from the oyra\n");
     oyra->count--;
-    pthread_mutex_unlock(&mtx);
+    pthread_mutex_unlock(&mtx_3);
     return data;
 }
 
@@ -103,18 +105,20 @@ int find_the_files(char* file, pthread_t thread, int max_size){
                 find_the_files(new_file,thread,max_size);
             }
         }
-        else{
+        else if (entry->d_type == DT_REG){
             pos++;
             sprintf(new_file, "%s/%s", file, entry->d_name);
             place(&oyra,new_file,max_size);
             printf("[Thread %ld]: Adding file <%s> to the queue…\n", thread, new_file);
-           
-            //assert(deque_get_at(queue, pos) == new_file);
+            //pthread_cond_signal(&cond_nonempty);
+            printf("pos= %d\n", pos);
         }
-        pos = 0;
+        else{
+            printf(">> i make pos=0\n");
+            pos = 0;
+        }
     }
-    closedir(folder);    
-    printf("HEEEEELLOOOO\n");
+    closedir(folder);
     return 0;
 }
 
@@ -124,6 +128,7 @@ void *communication_thread(void *argp){
     //printf("I am the newly created communication thread %ld\n", pthread_self());
     char buff[BUFF];    
     struct thread_args *args = (struct thread_args *) argp;
+
     // να διβάσει το path που εστειλε ο client
     if(read(args->f_socket, buff, BUFF) < 0){
         perror_exit("read");
@@ -133,9 +138,11 @@ void *communication_thread(void *argp){
     
     printf("[Thread %ld]: About to scan the directory %s\n", pthread_self(), buff);
     find_the_files(buff,pthread_self(),args->s_size);
-    printf("ela\n");
     pthread_cond_signal(&cond_nonempty);
-    
+    //pthread_cond_signal(&cvar);
+
+    printf(">>HEEEEELLOOOO\n");
+
     free(argp);
     pthread_exit(NULL);
 }
@@ -143,15 +150,32 @@ void *communication_thread(void *argp){
 /***************************************** worker thread ***********************************/
 
 void *worker_thread(void *arg){
+    int err;
     printf("Just created a worker thread %ld\n", pthread_self());
     
     struct thread_args *args = (struct thread_args *) arg;
-    printf("hey!!!\n");
+    int size = args->s_size;
+
+    pthread_cond_wait(&cvar, &mtx_2); //* Wait for signal
+
+    // if (err = pthread_mutex_lock(&mtx_2)) {            /* Lock mutex */
+    //     perror2("pthread_mutex_lock", err); exit(1); }
+    // printf("AAA Thread %ld: Locked the mutex\n", pthread_self());
+
+    printf(">>hey 2!!! counter = %d > %d\n", oyra.count, size);
+    // for(int i=0; i < size; i++){
+    //     printf(" >>>>> %s\n", oyra.data[i]);
+    // }
     while (oyra.count > 0) {
-        printf("consumer: %s\n", obtain(&oyra,args->s_size));
+        printf("consumer: %s\n", obtain(&oyra,size));
         pthread_cond_signal(&cond_nonfull);
     }
-    
+
+    // if (err = pthread_mutex_unlock(&mtx)) {                  /* Unlock mutex */
+    //     perror2("pthread_mutex_unlock", err); exit(1); }
+    // printf("Thread %ld: Unlocked the mutex\n", pthread_self());
+
+    printf("??? ARE YOU HERE ???\n");
     pthread_exit(NULL);
 }
 
@@ -172,10 +196,12 @@ int main(int argc, char *argv[]){
     pthread_t thr_com, thr_work;
     int err, status;
 
-    pthread_cond_init(&cvar, NULL); // initialize condition variable
+    pthread_cond_init(&cvar, 0); // initialize condition variable
 
     initialize(&oyra);
     pthread_mutex_init(&mtx, 0);
+    pthread_mutex_init(&mtx_2, 0);
+    pthread_mutex_init(&mtx_3, 0);
     pthread_cond_init(&cond_nonempty, 0);
     pthread_cond_init(&cond_nonfull, 0);
 
@@ -281,6 +307,8 @@ int main(int argc, char *argv[]){
     pthread_cond_destroy(&cond_nonempty);
     pthread_cond_destroy(&cond_nonfull);
     pthread_mutex_destroy(&mtx);
+    pthread_mutex_destroy(&mtx_2);
+    pthread_mutex_destroy(&mtx_3);
     
     return 0;
 }
