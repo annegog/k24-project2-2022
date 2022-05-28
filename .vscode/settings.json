@@ -1,5 +1,25 @@
 {
     "files.associations": {
-        "adtvector.h": "c"
+        "adtvector.h": "c",
+        "*.tcc": "c",
+        "unordered_map": "c",
+        "memory_resource": "c",
+        "algorithm": "c",
+        "functional": "c",
+        "memory": "c",
+        "random": "c",
+        "fstream": "c",
+        "initializer_list": "c",
+        "istream": "c",
+        "numeric": "c",
+        "streambuf": "c",
+        "cmath": "c",
+        "tuple": "c",
+        "utility": "c",
+        "type_traits": "c",
+        "typeinfo": "c",
+        "deque": "c",
+        "string": "c",
+        "vector": "c"
     }
 }
