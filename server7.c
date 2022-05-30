@@ -24,7 +24,6 @@
 
 pthread_mutex_t mtx;
 pthread_mutex_t mtx_2;
-pthread_mutex_t mtx_3;
 pthread_cond_t cond_nonempty;
 pthread_cond_t cond_nonfull;
 pthread_cond_t cvar;
@@ -164,39 +163,62 @@ void *communication_thread(void *argp){
     while(num_of_files > 0){
         place_the_files(buff,pthread_self(),args->s_size);
     }
-    
+    if(num_of_files == 0){
+        printf("ola einai mesa\n");
+        pthread_cond_signal(&cvar);
+    }
     free(argp);
     pthread_exit(0);
 }
 
-/***************************************** worker thread ***********************************/
+/*******************************************************************************************/
 
-void lala(int sock, char* file, int max_block){
+int write_data ( int fd, char* message ){/* Write formated data */
+	char temp; int length = 0;
+	length = strlen(message) + 1;	/* Find length of string */
+	temp = length;
+	if( write (fd, &temp, 1) < 0 )	/* Send length first */
+		exit (-2);
+	if( write (fd, message, length) < 0 )	/* Send string */
+		exit (-2);
+	return length;		/* Return size of string */
+}
+
+/*******************************************************************************************/
+
+void send_d(int sock, char* file, int max_block){
+    printf("{Thread: %ld}: About to read file %s\n", pthread_self(), file);
+
     int read_file, write_to_client;
     char buffer_read[BUFSIZ];
 
     int len = strcspn(file,"\n");
     file[len] = '\0';
-    write(sock, file, len+1);
-    printf("\nNEW FILE: %s\njust send the filename to the client\n", file);
+    write_data(sock, file);
+    printf(">> just send the filename to the client\n");
     
     // open the file and processed it
     if((read_file = open(file, O_RDONLY)) < 0){
         perror("can't open file");
         exit(EXIT_FAILURE);
     }
+
     printf("{Thread: %ld}: About to read file %s\n", pthread_self(), file);
     while ( (write_to_client = read(read_file, buffer_read, BUFSIZ)) > 0 ){
-        printf(">>I'm in. Send the file to the client now!\n");
-        send(socket, buffer_read, write_to_client, 0);
+        printf(">> I'm in. Send the file to the client now!\n");
+        send(sock, buffer_read, write_to_client, 0);
     }
     
     close(read_file);
-    printf("eeedw to file:%s teleisw.\tLE POYLEE\n\n", file);
+    printf("! eeedw to file:%s teleisw.\tLE POYLEE\n\n", file);
+    usleep(500000);
+
 }
 
+/***************************************** worker thread ***********************************/
+
 void *worker_thread(void *arg){
-    //printf("Just created a worker thread %ld\n", pthread_self());
+    // printf("Just created a worker thread %ld\n", pthread_self());
     
     struct thread_args *args = (struct thread_args *) arg;
     int size = args->s_size;
@@ -207,18 +229,16 @@ void *worker_thread(void *arg){
     while (oyra.count > 0 || num_of_files > 0) {
         //strcpy(file, obtain(&oyra,size));
         file = obtain(&oyra,size);
-        printf("---{Thread %ld}: Received task: <%s, %d>\n", pthread_self(), file, args->f_socket);
-        //fopen kai na to steilw ston client
-        printf("{Thread: %ld}: About to read file %s\n", pthread_self(), file);
-        lala(args->f_socket, file, args->bl_size);
+        printf("{Thread %ld}: Received task: <%s, %d>\n", pthread_self(), file, args->f_socket);
+        send_d(args->f_socket, file, args->bl_size);
 
         
         pthread_cond_signal(&cond_nonfull);
-        //usleep(300000);
+        // usleep(300000);
 
     }
 
-    printf(">>No more files to read. You're back in the worker thread :( \n");
+    printf(">> No more files to read. You're back in the worker thread :( \n");
     pthread_exit(0);
 }
 
@@ -234,7 +254,6 @@ int main(int argc, char *argv[]){
     socklen_t clientlen;
     struct sockaddr *serverptr=(struct sockaddr *)&server;
     struct sockaddr *clientptr=(struct sockaddr *)&client;
-    struct hostent *rem;
     
     pthread_t thr_com, thr_work;
     int err, status;
@@ -244,7 +263,6 @@ int main(int argc, char *argv[]){
     initialize(&oyra);
     pthread_mutex_init(&mtx, 0);
     pthread_mutex_init(&mtx_2, 0);
-    pthread_mutex_init(&mtx_3, 0);
     pthread_cond_init(&cond_nonempty, 0);
     pthread_cond_init(&cond_nonfull, 0);
 
@@ -353,7 +371,6 @@ int main(int argc, char *argv[]){
     pthread_cond_destroy(&cond_nonfull);
     pthread_mutex_destroy(&mtx);
     pthread_mutex_destroy(&mtx_2);
-    pthread_mutex_destroy(&mtx_3);
     
     return 0;
 }
