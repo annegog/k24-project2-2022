@@ -218,7 +218,7 @@ void send_d(int sock, char* file, int max_block){
 
 void *worker_thread(void *arg){
     // printf("Just created a worker thread %ld\n", pthread_self());
-    
+
     struct thread_args *args = (struct thread_args *) arg;
     int size = args->s_size;
 
@@ -302,17 +302,14 @@ int main(int argc, char *argv[]){
     /************************** create the worker threads **********************************/
     
     // make a pool- array for the worker threads
-    pthread_t * pool_threads_array;
-    pool_threads_array = malloc (sizeof(pthread_t) * thread_pool_size);
+    pthread_t * worker_thr_id = malloc(thread_pool_size * sizeof(*worker_thr_id));
     
     for(pthread_t i=0; i<thread_pool_size; i++){
-        if ((err = pthread_create(&thr_work, NULL, worker_thread, args))){
+        if ((err = pthread_create(&worker_thr_id[i], NULL, worker_thread, args))){
             perror2("pthread_create", err);
             exit(1);
         }
-        //printf("Thread %ld: Created thread %ld\n", pthread_self(), thr_work);
-
-        pool_threads_array[i]= thr_work;
+        printf("Thread %ld: Created thread %ld\n", pthread_self(), worker_thr_id[i]);
 
     }
 
@@ -365,7 +362,9 @@ int main(int argc, char *argv[]){
     printf("Thread %ld exited with code %d\n", thr_com, status);
     pthread_exit(NULL);
 
-    free(pool_threads_array);
+    for(pthread_t i=0; i<thread_pool_size; i++){
+        free(worker_thr_id);
+    }
     pthread_cond_destroy(&cond_nonempty);
     pthread_cond_destroy(&cond_nonfull);
     pthread_mutex_destroy(&mtx);
