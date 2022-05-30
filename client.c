@@ -54,7 +54,6 @@ int find_the_file(char* dir, char* file){
     return fd;
 }
 
-
 char* separate(char* path){
     char s[2] = "/";
     char* temp;
@@ -65,17 +64,6 @@ char* separate(char* path){
         temp = strtok(NULL, s);
     }
     return file;
-}
-
-int write_data ( int fd, char* message ){/* Write formated data */
-	char temp; int length = 0;
-	length = strlen(message) + 1;	/* Find length of string */
-	temp = length;
-	if( write (fd, &temp, 1) < 0 )	/* Send length first */
-		exit (-2);
-	if( write (fd, message, length) < 0 )	/* Send string */
-		exit (-2);
-	return length;		/* Return size of string */
 }
 
 int read_data (int fd, char *buffer){/* Read formated data */
@@ -92,7 +80,6 @@ int read_data (int fd, char *buffer){/* Read formated data */
 int main(int argc, char *argv[]){
 
     int port, sock;
-    char buf[BUFF];
     char buffer[BUFSIZ];
     char buffer_read[BUFSIZ];
     char *directory;
@@ -136,42 +123,35 @@ int main(int argc, char *argv[]){
 	   perror_exit("connect");
     printf("Connecting to %s port %d\n\n", rem->h_name, port);
 
-    strcpy(buf,directory);
+    // write the path we want to copy on client's file system
+    if (write(sock, directory, strlen(directory)+1) < 0)
+        perror_exit("write");
 
-    
     while(1){
-        // write the path we want to copy on client's file system
-        if (write(sock, buf, BUFF) < 0)
-            perror_exit("write");
 
-        // read the name of the file
-        // if(read(sock,buffer, BUFF) < 0){
-        //     perror("read");
-        // }
         read_data(sock,buffer);
         
         char* file = separate(buffer);
         printf("File: %s\n",file);
-        usleep(1000);
         
         /*********************************************************/
-        
-        // create a file in the current dir.
-        // so we copy the (server) file to the /file
-        
         int fd = find_the_file(directory,file);
+
+        // create a file in the current dir.
+        // so we copy the (server) file to the /file        
         FILE *write_file = fopen(file, "w");
         if ( write_file == NULL){   
             printf("Error! Could not open file\n"); 
             exit(EXIT_FAILURE); 
         }
 
-        while( recv(sock, buffer_read, BUFF, 0) > 0){
-            //printf(">>THE DATA:\n%s //telos\n", buffer_read);
-            fprintf(write_file,"%s", buffer_read);
-            sleep(1);
-        }usleep(10000);
-        printf("out of the while recv\n");
+        // while( recv(sock, buffer_read, BUFF, 0) > 0){
+        //     //printf(">>THE DATA:\n%s //telos\n", buffer_read);
+        //     fprintf(write_file,"%s", buffer_read);
+        //     sleep(1);
+        // }
+        // usleep(10000);
+        // printf("out of the while recv\n");
 
         fprintf(write_file,"skata...out of the while!");
         

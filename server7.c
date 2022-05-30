@@ -164,11 +164,11 @@ void *communication_thread(void *argp){
         place_the_files(buff,pthread_self(),args->s_size);
     }
     if(num_of_files == 0){
-        printf("ola einai mesa\n");
+        printf(">> No more files to add\n");
         pthread_cond_signal(&cvar);
     }
     free(argp);
-    pthread_exit(0);
+    return 0;
 }
 
 /*******************************************************************************************/
@@ -187,7 +187,7 @@ int write_data ( int fd, char* message ){/* Write formated data */
 /*******************************************************************************************/
 
 void send_d(int sock, char* file, int max_block){
-    printf("{Thread: %ld}: About to read file %s\n", pthread_self(), file);
+    //printf("{Thread: %ld}: About to read file %s\n", pthread_self(), file);
 
     int read_file, write_to_client;
     char buffer_read[BUFSIZ];
@@ -197,19 +197,18 @@ void send_d(int sock, char* file, int max_block){
     write_data(sock, file);
     printf(">> just send the filename to the client\n");
     
-    // open the file and processed it
-    if((read_file = open(file, O_RDONLY)) < 0){
-        perror("can't open file");
-        exit(EXIT_FAILURE);
-    }
+    // // open the file and processed it
+    // if((read_file = open(file, O_RDONLY)) < 0){
+    //     perror("can't open file");
+    //     exit(EXIT_FAILURE);
+    // }
 
-    printf("{Thread: %ld}: About to read file %s\n", pthread_self(), file);
-    while ( (write_to_client = read(read_file, buffer_read, BUFSIZ)) > 0 ){
-        printf(">> I'm in. Send the file to the client now!\n");
-        send(sock, buffer_read, write_to_client, 0);
-    }
+    // while ( (write_to_client = read(read_file, buffer_read, max_block)) > 0 ){
+    //     printf(">> I'm in. Send the file to the client now!\n");
+    //     send(sock, buffer_read, write_to_client, 0);
+    // }
     
-    close(read_file);
+    // close(read_file);
     printf("! eeedw to file:%s teleisw.\tLE POYLEE\n\n", file);
     usleep(500000);
 
@@ -226,16 +225,15 @@ void *worker_thread(void *arg){
     pthread_cond_wait(&cvar, &mtx_2); //* Wait for signal
     
     char* file;
-    while (oyra.count > 0 || num_of_files > 0) {
+    while (oyra.count > 0 || num_of_files > 0){
         //strcpy(file, obtain(&oyra,size));
         file = obtain(&oyra,size);
+        pthread_cond_signal(&cond_nonfull);
+
         printf("{Thread %ld}: Received task: <%s, %d>\n", pthread_self(), file, args->f_socket);
         send_d(args->f_socket, file, args->bl_size);
 
-        
-        pthread_cond_signal(&cond_nonfull);
         // usleep(300000);
-
     }
 
     printf(">> No more files to read. You're back in the worker thread :( \n");
@@ -353,8 +351,9 @@ int main(int argc, char *argv[]){
         }
         //printf("Thread %ld: Created thread %ld\n", pthread_self(), thr_com);
 
-    	//close(newsock); //------- parent closes socket to client
     }
+    close(newsock); //closes socket to client
+
     
     /***************************************************************************************/
     
