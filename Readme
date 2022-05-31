@@ -20,7 +20,8 @@ Anna Gogoula 1115201800305
       he is receving the file's data, he is writing them in the file. 
 
 -------------------------------------------------------------
-*Further observations*
+* Further observations *
 - I'm using code from the slides!
 - Put the args you want in the Makefiles. (I have an example)
-- 
+------------------------------------------------------------------
+Sum up: server is just reading the file and give to the client the namefile. I CAN'T MAKE IT TO SEND THE DATA!!! :( 

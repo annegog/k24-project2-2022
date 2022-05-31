@@ -24,7 +24,7 @@ void *communication_thread(void *argp){
     char buff[BUFF];    
     struct thread_args *args = (struct thread_args *) argp;
 
-    // να διβάσει το path που εστειλε ο client
+    // read the path from the client
     if(read(args->f_socket, buff, BUFF) < 0){
         perror_exit("read");
     }
@@ -34,6 +34,7 @@ void *communication_thread(void *argp){
     while(num_of_files > 0){
         place_the_files(buff,pthread_self(),args->s_size);
     }
+    
     if(num_of_files == 0){
         printf(">> No more files to add\n");
         pthread_cond_signal(&cvar);
