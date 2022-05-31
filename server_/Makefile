@@ -12,7 +12,7 @@ HEADER = server.h
 EXEC = dataServer
 
 # Παράμετροι για δοκιμαστική εκτέλεση
-ARGS = -p 12502 -s 2 -q 1 -b 543
+ARGS = -p 12502 -s 2 -q 2 -b 543
 
 $(EXEC): $(OBJS)
 	$(CC) $(OBJS) -o $(EXEC) $(FLAGT)
