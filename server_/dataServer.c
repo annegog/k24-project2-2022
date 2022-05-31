@@ -36,7 +36,6 @@ void *communication_thread(void *argp){
     }
     
     if(num_of_files == 0){
-        printf(">> No more files to add\n");
         pthread_cond_signal(&cvar);
     }
     free(argp);
@@ -50,10 +49,7 @@ void send_d(int sock, char* file, int max_block){
     int read_file, write_to_client;
     char buffer_read[BUFSIZ];
 
-    int len = strcspn(file,"\n");
-    file[len] = '\0';
     write_data(sock, file);
-    printf(">> just send the filename to the client\n");
     
     // // open the file and processed it
     // if((read_file = open(file, O_RDONLY)) < 0){
@@ -67,8 +63,7 @@ void send_d(int sock, char* file, int max_block){
     // }
     
     // close(read_file);
-    printf("! eeedw to file:%s teleisw.\tLE POYLEE\n\n", file);
-    usleep(500000);
+    printf("\t\tLE POYLEE\n\n", file);
 
 }
 
@@ -91,10 +86,9 @@ void *worker_thread(void *arg){
         printf("{Thread %ld}: Received task: <%s, %d>\n", pthread_self(), file, args->f_socket);
         send_d(args->f_socket, file, args->bl_size);
 
-        // usleep(300000);
     }
 
-    printf(">> No more files to read. You're back in the worker thread :( \n");
+    printf(">> No more files to read. I don't know what to dooo now!:( \n");
     pthread_exit(0);
 }
 
