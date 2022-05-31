@@ -1,0 +1,30 @@
+K24 ERGASIA 2 2022
+Anna Gogoula 1115201800305
+----------------------------------------------------------
+- server_
+    *dataServer:
+        - communication_thread: reads the path/ directory from the client. For every regural file in the 
+            directory calls the place_the_files function
+        - worker_thread: waiting for a signal. If the queue is full and there are more files remain to 
+            read, calls the obtain function. And then, the worker thread calls send_d func.
+        - send_d: sending the namefile and the length of that to the client. (Open than file and strart 
+            reading it  block by block and sending everyting in the client. == He does not!!!!)
+    *server.h:
+        - place: place a file in the queue. If the queue is full is waiting for a signal and give the signal 
+            to the worker thread so can pop a file from the queue.
+        - obtain: if the queue is empty is waiting for the communication thread. Else is poping a file.
+        - find_num_of_files: opening the directory we want to process and counting the files.
+        - place_the_files: is also opening the directory and for every file calls the place function.
+
+- client_
+    *remoteClient: Sending the directory name that he wants to copy. Taking from the server the name 
+        of every file. Making a file and writes a messege "hi" cause I didn't make it!
+
+-------------------------------------------------------------
+* Further observations *
+- I'm using code from the slides!
+- Put the args you want in the Makefiles. (I have an example)
+------------------------------------------------------------------
+
+**Sum up: server is just reading the file and give to the client the namefile. I CAN'T MAKE IT TO SEND THE 
+        DATA and he doesn't send all the files !!! :( 
