@@ -68,7 +68,7 @@ void send_d(int sock, char* file, int max_block){
 }
 
 /***************************************** worker thread ***********************************/
-
+//a
 void *worker_thread(void *arg){
     // printf("Just created a worker thread %ld\n", pthread_self());
 
