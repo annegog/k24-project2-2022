@@ -13,8 +13,6 @@
 #include <string.h>
 #include <dirent.h>
 #include <sys/stat.h>
-#include <fcntl.h>
-
 
 #define BUFF 4092
 
@@ -38,7 +36,6 @@ void sigchld_handler (int sig);
 struct thread_args {
     int f_socket;
     int s_size;
-    int bl_size;
 };
 
 /***************************************************************************************/
@@ -61,13 +58,25 @@ void initialize(queue_t *oyra) {
 void place(queue_t *oyra, char* data, int size) {
     pthread_mutex_lock(&mtx);
     while (oyra->count >= size){
-        //printf(">>Buffer Full!\tI'm waiting a work thread\n");
+        printf(">>Buffer Full!\tI'm waiting a work thread\n");
         pthread_cond_signal(&cvar);
         pthread_cond_wait(&cond_nonfull, &mtx);
     }
+
+    printf("\n");
+    for(int i=0; i < size; i++){
+        printf("-- %s --", oyra->data[i]);
+    }printf("\n\n");
+
     oyra->end = (oyra->end + 1) % size;
     oyra->data[oyra->end] = data;
     oyra->count++;
+
+    printf("+++ place a file <%s> in the oyra.\n", oyra->data[oyra->end]);
+    
+    for(int i=0; i < size; i++){
+        printf(">> %s\n", oyra->data[i]);
+    }
     pthread_mutex_unlock(&mtx);
 }
 
@@ -75,11 +84,15 @@ char* obtain(queue_t * oyra, int size) {
     char* data;
     pthread_mutex_lock(&mtx);
     while (oyra->count <= 0) {
-        //printf(">>Buffer Empty!\tI'm waiting the com-thread\n");
+        printf(">>Buffer Empty!\tI'm waiting the com-thread\n");
         pthread_cond_wait(&cond_nonempty, &mtx);
+    }
+    for(int i=0; i < size; i++){
+        printf(">>>>> %s\n", oyra->data[i]);
     }
     data = oyra->data[oyra->start];
     oyra->start = (oyra->start + 1) % size;
+    printf("--- took a file <%s> from the oyra\n", data);
     oyra->count--;
     pthread_mutex_unlock(&mtx);
     return data;
@@ -136,10 +149,16 @@ int place_the_files(char* file, pthread_t thread, int max_size){
             sprintf(new_file, "%s/%s", file, entry->d_name);
 
             place(&oyra, new_file, max_size);
-            //printf("[Thread %ld]: Adding file <%s>to the queue…\n", thread, new_file);
+            printf("[Thread %ld]: Adding file <%s>to the queue…\n", thread, new_file);
             num_of_files--;
+            
+            printf("\n OYRA: ");
+            for(int i=0; i < max_size; i++){
+                printf("-- %s --", oyra.data[i]);
+            }printf("\n\n");
+
             pthread_cond_signal(&cond_nonempty);
-            //usleep(300000);
+            usleep(300000);
 
         }
     }
@@ -162,71 +181,42 @@ void *communication_thread(void *argp){
     // να βάλει το αρχειο στην ουρά
     // αν η ουρά ειναι γεμάτη περιμένει
     
-    //printf("\n[Thread %ld]: About to scan the directory %s\n", pthread_self(), buff);
+    printf("\n[Thread %ld]: About to scan the directory %s\n", pthread_self(), buff);
     
     while(num_of_files > 0){
         place_the_files(buff,pthread_self(),args->s_size);
+
     }
     
+    //printf(">>HEEEEELLOOOO\n");
+
     free(argp);
     pthread_exit(0);
-}
-
-/***************************************************************************************/
-
-int open_send(char* file, int socket, int max_buffer){
-    int fd, read_file, write_to_client;
-    char buff[BUFF];
-    char buffer[BUFF];    
-    char buffer_file[BUFSIZ];
-    
-    int len = strcspn(file,"\n");
-    file[len] = '\0';
-
-    write(socket,file,len+1);
-    printf("just send the namefile to the client\n");
-    
-    //printf("---{Thread %ld}: Received task: <%s, %d>\n", pthread_self(), file, socket);
-    pthread_cond_signal(&cond_nonfull);
-    
-    /*********************************************************/
-
-    // open the file, to processed it 
-    if((read_file = open(file, O_RDONLY)) < 0){
-        perror("can't open file");
-        exit(EXIT_FAILURE);
-    }
-    printf("the file: %s in now open\n", file);
-    sleep(2);
-    while ( (write_to_client = read(read_file, buffer_file, BUFSIZ)) > 0 ){
-        //printf(">> %s\n", buffer_file);
-        printf(">>I'm in\n>>Send the file to the client now!\n");
-        send(socket, buffer_file, write_to_client, 0);
-    }
-    
-    close(read_file);
-    printf("eeedw to file:%s teleisw.\tpoylooo\n", file);
-    return 0;
 }
 
 /***************************************** worker thread ***********************************/
 
 void *worker_thread(void *arg){
-    //printf("Just created a worker thread %ld\n", pthread_self());
+    printf("Just created a worker thread %ld\n", pthread_self());
     
     struct thread_args *args = (struct thread_args *) arg;
     int size = args->s_size;
 
     pthread_cond_wait(&cvar, &mtx_2); //* Wait for signal
     
-    //char* file;
+    char* file;
     while (oyra.count > 0 || num_of_files > 0) {
-        open_send(obtain(&oyra,size), args->f_socket, args->bl_size);
-        // file = obtain(&oyra,size);
-        // printf("lalalal %s\n", file);
+        //strcpy(file, obtain(&oyra,size));
+        file = obtain(&oyra,size);
+        printf("{Thread %ld}: Received task: <%s>\n", pthread_self(), file);
+        //fopen kai na to steilw ston client
+        // 
+        pthread_cond_signal(&cond_nonfull);
+        //usleep(300000);
 
     }
-    printf(">>YOU are HERE :( \n");
+
+    printf("??? ARE YOU HERE ???\n");
     pthread_exit(0);
 }
 
@@ -289,7 +279,6 @@ int main(int argc, char *argv[]){
     struct thread_args *args = malloc (sizeof (struct thread_args));
     args->f_socket = newsock;
     args->s_size = queue_size;
-    args->bl_size = block_size;
 
     /************************** create the worker threads **********************************/
     
@@ -335,7 +324,6 @@ int main(int argc, char *argv[]){
         
         args->f_socket = newsock;
         args->s_size = queue_size;
-        args->bl_size = block_size;
 
         if (err = pthread_create(&thr_com, NULL, communication_thread, args)){
             perror2("pthread_create", err);

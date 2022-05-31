@@ -5,14 +5,14 @@
 # compiler
 CC = gcc
 # Compile options
-CFLAGS = -Wall -g
+CFLAGS = -g -Wall
 # Αρχεία .o
 OBJS = remoteClient.o dataServer.o
 #HEADER = 
 
 
 # Το εκτελέσιμο πρόγραμμα
-EXEC = sniffer
+EXEC = s
 
 # Παράμετροι για δοκιμαστική εκτέλεση
 #ARGS = 

@@ -12,9 +12,6 @@
 #include <pthread.h>         /* For threads */
 #include <string.h>
 
-#include "ADTDeque.h"
-#include "ADTDeque.c"
-
 #define BUFF 4096
 
 #define perror2(s,e) fprintf(stderr, "%s: %s\n", s, strerror(e))
@@ -127,7 +124,6 @@ int main(int argc, char *argv[]){
     signal(SIGCHLD, sigchld_handler);
 
     // create the deque of files
-    Deque queue_of_files = deque_create(queue_size,NULL);
 
     /************************** create the worker threads **********************************/
     
