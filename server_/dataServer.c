@@ -11,67 +11,90 @@
 #include <signal.h>          /* signal */
 #include <pthread.h>         /* For threads */
 #include <string.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
-#define BUFF 4096
+#include "server.h"
 
-#define perror2(s,e) fprintf(stderr, "%s: %s\n", s, strerror(e))
+/****************************** communication thread ***************************************/
 
-/***************************************************************************************/
-
-pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t cvar;                                             /* Condition variable */
-
-/***************************************************************************************/
-
-void perror_exit(char *message);
-void sigchld_handler (int sig);
-    
-/***************************************************************************************/
-
-void *communication_thread(void *argp){ /* Thread function */
-    printf("I am the newly created communication thread %ld\n", pthread_self());
-    int sock = *(int*)argp;
-    char buff[BUFF];
-
-    if(read(sock, buff, BUFF) < 0){
-        perror_exit("read");
-    }   
-    printf("I read: %s\n", buff);
+void *communication_thread(void *argp){ 
+    //printf("I am the newly created communication thread %ld\n", pthread_self());
+    char buff[BUFF];    
+    struct thread_args *args = (struct thread_args *) argp;
 
     // να διβάσει το path που εστειλε ο client
-   
-    //deque_insert_first(deque, a);
-    // να βάλει το αρχελιο στην ουρά
-    // αν η ουρά ειναι γεμάτη περιμένει
-
+    if(read(args->f_socket, buff, BUFF) < 0){
+        perror_exit("read");
+    }
+    find_num_of_files(buff);
+    printf("\n[Thread %ld]: About to scan the directory %s\n", pthread_self(), buff);
+    
+    while(num_of_files > 0){
+        place_the_files(buff,pthread_self(),args->s_size);
+    }
+    if(num_of_files == 0){
+        printf(">> No more files to add\n");
+        pthread_cond_signal(&cvar);
+    }
     free(argp);
-    pthread_exit(NULL);
+    return 0;
 }
 
-/***************************************************************************************/
+
+void send_d(int sock, char* file, int max_block){
+    //printf("{Thread: %ld}: About to read file %s\n", pthread_self(), file);
+
+    int read_file, write_to_client;
+    char buffer_read[BUFSIZ];
+
+    int len = strcspn(file,"\n");
+    file[len] = '\0';
+    write_data(sock, file);
+    printf(">> just send the filename to the client\n");
+    
+    // // open the file and processed it
+    // if((read_file = open(file, O_RDONLY)) < 0){
+    //     perror("can't open file");
+    //     exit(EXIT_FAILURE);
+    // }
+
+    // while ( (write_to_client = read(read_file, buffer_read, max_block)) > 0 ){
+    //     printf(">> I'm in. Send the file to the client now!\n");
+    //     send(sock, buffer_read, write_to_client, 0);
+    // }
+    
+    // close(read_file);
+    printf("! eeedw to file:%s teleisw.\tLE POYLEE\n\n", file);
+    usleep(500000);
+
+}
+
+/***************************************** worker thread ***********************************/
 
 void *worker_thread(void *arg){
-    int err;
+    // printf("Just created a worker thread %ld\n", pthread_self());
 
-    printf("Just created a worker thread %ld\n", pthread_self());
-    //printf("Thread %ld: Waiting for signal\n", pthread_self());
-    pthread_cond_wait(&cvar, &mtx); //* Wait for signal
+    struct thread_args *args = (struct thread_args *) arg;
+    int size = args->s_size;
 
-    if (err = pthread_mutex_lock(&mtx)) {            /* Lock mutex */
-        perror2("pthread_mutex_lock", err); exit(1); }
-    printf("AAA Thread %ld: Locked the mutex\n", pthread_self());
+    pthread_cond_wait(&cvar, &mtx_2); //* Wait for signal
+    
+    char* file;
+    while (oyra.count > 0 || num_of_files > 0){
+        //strcpy(file, obtain(&oyra,size));
+        file = obtain(&oyra,size);
+        pthread_cond_signal(&cond_nonfull);
 
-    // META
-    // gia na to bgalw apo to wait
-    /* Wake up one thread waiting for condition variable COND.  */
-    pthread_cond_signal(&cvar);                          /* Awake thread */
-    printf("Thread %ld: Sent signal\n", pthread_self());
+        printf("{Thread %ld}: Received task: <%s, %d>\n", pthread_self(), file, args->f_socket);
+        send_d(args->f_socket, file, args->bl_size);
 
-    if (err = pthread_mutex_unlock(&mtx)) {                  /* Unlock mutex */
-        perror2("pthread_mutex_unlock", err); exit(1); }
-    printf("Thread %ld: Unlocked the mutex\n", pthread_self());
+        // usleep(300000);
+    }
 
-    pthread_exit(NULL);
+    printf(">> No more files to read. You're back in the worker thread :( \n");
+    pthread_exit(0);
 }
 
 /***************************************************************************************/
@@ -86,13 +109,18 @@ int main(int argc, char *argv[]){
     socklen_t clientlen;
     struct sockaddr *serverptr=(struct sockaddr *)&server;
     struct sockaddr *clientptr=(struct sockaddr *)&client;
-    struct hostent *rem;
     
     pthread_t thr_com, thr_work;
     int err, status;
 
-    pthread_cond_init(&cvar, NULL); // initialize condition variable
-    
+    pthread_cond_init(&cvar, 0); // initialize condition variable
+
+    initialize(&oyra);
+    pthread_mutex_init(&mtx, 0);
+    pthread_mutex_init(&mtx_2, 0);
+    pthread_cond_init(&cond_nonempty, 0);
+    pthread_cond_init(&cond_nonfull, 0);
+
     /******************************** arguments ********************************************/
     
     if (argc != 9){
@@ -116,45 +144,35 @@ int main(int argc, char *argv[]){
         }
         if (strcmp(argv[i], "-b") == 0){
             block_size = atoi(argv[i + 1]);
-            printf("block size: %d\n", block_size);
+            printf("block size: %d\n\n", block_size);
         }
     }
 
     // Reap dead children asynchronously
     signal(SIGCHLD, sigchld_handler);
-
-    // create the deque of files
+    
+    struct thread_args *args = malloc (sizeof (struct thread_args));
+    args->f_socket = newsock;
+    args->s_size = queue_size;
+    args->bl_size = block_size;
 
     /************************** create the worker threads **********************************/
     
     // make a pool- array for the worker threads
-    pthread_t * pool_threads_array;
-    pool_threads_array = malloc (sizeof(pthread_t) * thread_pool_size);
+    pthread_t * worker_thr_id = malloc(thread_pool_size * sizeof(*worker_thr_id));
     
     for(pthread_t i=0; i<thread_pool_size; i++){
-        // Lock mutex
-        if (err = pthread_mutex_lock(&mtx)){                           
-            perror2("pthread_mutex_lock", err); exit(1); }
-        //printf("Thread %ld: Locked the mutex\n", pthread_self());
-
-        if (err = pthread_create(&thr_work, NULL, worker_thread, NULL)){
+        if ((err = pthread_create(&worker_thr_id[i], NULL, worker_thread, args))){
             perror2("pthread_create", err);
             exit(1);
         }
-        printf("Thread %ld: Created thread %ld\n", pthread_self(), thr_work);
+        printf("Thread %ld: Created thread %ld\n", pthread_self(), worker_thr_id[i]);
 
-        pool_threads_array[i]= thr_work;
-
-        // Unlock mutex
-        if (pthread_mutex_unlock(&mtx)) {                     
-            perror("pthread_mutex_unlock"); exit(1); }
-        //printf("Thread %ld: Unlocked the mutex\n", pthread_self());
     }
 
     /***************************************************************************************/
-
     // Create socket
-    //printf("create socket\n");
+    // printf("create socket\n");
     if ((sock = socket(PF_INET, SOCK_STREAM, 0)) < 0)
         perror_exit("socket");
     server.sin_family = AF_INET;       /* Internet domain */
@@ -169,7 +187,7 @@ int main(int argc, char *argv[]){
     if (listen(sock, 200) < 0) 
         perror_exit("listen");
     printf("Listening for connections to port %d\n", port);
-    while(1){ 
+    while(1){
         clientlen = sizeof(client);
     	if ((newsock = accept(sock, clientptr, &clientlen)) < 0) 
             perror_exit("accept");
@@ -177,36 +195,37 @@ int main(int argc, char *argv[]){
         
         /************************* making the communication thread *************************/
         
-        int* pr_new = malloc(sizeof(int));
-        *pr_new= newsock;
-        if (err = pthread_create(&thr_com, NULL, communication_thread, pr_new)){
+        args->f_socket = newsock;
+        args->s_size = queue_size;
+        args->bl_size = block_size;
+
+        if ((err = pthread_create(&thr_com, NULL, communication_thread, args))){
             perror2("pthread_create", err);
             exit(1);
         }
-    	//close(newsock); //------- parent closes socket to client
+        //printf("Thread %ld: Created thread %ld\n", pthread_self(), thr_com);
+
     }
+    close(newsock); //closes socket to client
+
     
     /***************************************************************************************/
     
     // delete the com-thread
-    if (err = pthread_join(thr_com, (void **) &status)) { /* Wait for thread */
+    if ((err = pthread_join(thr_com, (void **) &status)) ) { /* Wait for thread */
         perror2("pthread_join", err); /* termination */
         exit(1);
     }
     printf("Thread %ld exited with code %d\n", thr_com, status);
     pthread_exit(NULL);
 
-    free(pool_threads_array);
+    for(pthread_t i=0; i<thread_pool_size; i++){
+        free(worker_thr_id);
+    }
+    pthread_cond_destroy(&cond_nonempty);
+    pthread_cond_destroy(&cond_nonfull);
+    pthread_mutex_destroy(&mtx);
+    pthread_mutex_destroy(&mtx_2);
+    
     return 0;
-}
-
-
-void perror_exit(char *message){
-    perror(message);
-    exit(EXIT_FAILURE);
-}
-
-// Wait for all dead child processes
-void sigchld_handler (int sig) {
-	while (waitpid(-1, NULL, WNOHANG) > 0);
 }
