@@ -1,31 +1,28 @@
-####
-#Anna Gogoula
-###
-
 # compiler
 CC = gcc
 # Compile options
 CFLAGS = -g -Wall
+FLAGT = -lpthread
 # Αρχεία .o
-OBJS = remoteClient.o dataServer.o
-#HEADER = 
+OBJS = dataServer.o
+HEADER = server.h 
 
 
 # Το εκτελέσιμο πρόγραμμα
-EXEC = s
+EXEC = dataServer
 
 # Παράμετροι για δοκιμαστική εκτέλεση
-#ARGS = 
+ARGS = -p 12502 -s 2 -q 1 -b 543
 
 $(EXEC): $(OBJS)
-	$(CC) $(OBJS) -o $(EXEC)
+	$(CC) $(OBJS) -o $(EXEC) $(FLAGT)
 	@if [ -f $(EXEC).exe ]; then ln -sf $(EXEC).exe $(EXEC); fi
 
 clean:
-	rm -f $(OBJS) $(EXEC) $(OUT1) $(OUT2)
+	rm -f $(OBJS) $(EXEC)
 
 run: $(EXEC)
-	./$(EXEC)
+	./$(EXEC) $(ARGS)
 
 valgrind: $(EXEC)
 	valgrind --error-exitcode=1 --leak-check=full --show-leak-kinds=all ./$(EXEC) $(ARGS)
