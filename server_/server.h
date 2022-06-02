@@ -23,6 +23,8 @@
 
 pthread_mutex_t mtx;
 pthread_mutex_t mtx_2;
+pthread_mutex_t mtx_3;
+pthread_mutex_t mtx_4;
 pthread_cond_t cond_nonempty;
 pthread_cond_t cond_nonfull;
 pthread_cond_t cvar;
@@ -34,6 +36,8 @@ struct thread_args {
     int s_size;
     int bl_size;
 };
+
+int sock_copy = 0;
 
 /***************************************************************************************/
 
@@ -129,16 +133,18 @@ int place_the_files(char* file, pthread_t thread, int max_size){
             }
         }
         else if (entry->d_type == DT_REG){
-            sprintf(new_file, "%s/%s", file, entry->d_name);
-
-            place(&oyra, new_file, max_size);
-            printf("[Thread %ld]: Adding file <%s>to the queue…\n", thread, new_file);
+            pthread_mutex_lock(&mtx_3);
+        
+            //sprintf(new_file, "%s/%s", file, entry->d_name);
+            
+            place(&oyra, entry->d_name, max_size);
+            printf("[Thread %ld]: Adding file <%s> to the queue…\n", thread, entry->d_name);
             num_of_files--;
             pthread_cond_signal(&cond_nonempty);
-            //usleep(300000);
-
+            pthread_mutex_unlock(&mtx_3);
         }
     }
+
     closedir(folder);
     return 0;
 }

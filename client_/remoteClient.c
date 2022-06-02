@@ -16,7 +16,7 @@
 
 int main(int argc, char *argv[]){
 
-    int port, sock;
+    int port, sock, reading;
     char buffer[BUFSIZ];
     char buffer_read[BUFSIZ];
     char *directory;
@@ -69,30 +69,28 @@ int main(int argc, char *argv[]){
         read_data(sock,buffer);
         
         char* file = separate(buffer);
-        printf("File: %s\n",file);
+        printf("Received File: %s\n",file);
         
         /*********************************************************/
         int fd = find_the_file(directory,file);
 
         // create a file in the current dir.
         // so we copy the (server) file to the /file        
-        FILE *write_file = fopen(file, "w");
-        if ( write_file == NULL){   
-            printf("Error! Could not open file\n"); 
-            exit(EXIT_FAILURE); 
-        }
-
-        // while( recv(sock, buffer_read, BUFF, 0) > 0){
-        //     //printf(">>THE DATA:\n%s //telos\n", buffer_read);
-        //     fprintf(write_file,"%s", buffer_read);
-        //     sleep(1);
+        // FILE *write_file = fopen(file, "w+");
+        // if ( write_file == NULL){   
+        //     printf("Error! Could not open file\n"); 
+        //     exit(EXIT_FAILURE); 
         // }
-        // usleep(10000);
-        // printf("out of the while recv\n");
-
-        fprintf(write_file,"skata...out of the while!");
+        // while( (reading = read(sock, buffer_read, BUFF)) > 0){
+        //     printf("%s", buffer_read);
+        //     fprintf(write_file,"%s", buffer_read);
+        // }
+  
+        //fprintf(write_file,"skata...!");
+        //printf("out of the while recv\n");
         
-        fclose(write_file);
+        //fclose(write_file);
+        
         close(fd);
     }
 

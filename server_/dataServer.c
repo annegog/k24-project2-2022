@@ -34,7 +34,6 @@ void *communication_thread(void *argp){
     while(num_of_files > 0){
         place_the_files(buff,pthread_self(),args->s_size);
     }
-    
     if(num_of_files == 0){
         pthread_cond_signal(&cvar);
     }
@@ -44,13 +43,13 @@ void *communication_thread(void *argp){
 
 
 void send_d(int sock, char* file, int max_block){
-    //printf("{Thread: %ld}: About to read file %s\n", pthread_self(), file);
+    printf("{Thread: %ld}: About to read file: %s\n", pthread_self(), file);
 
     int read_file, write_to_client;
     char buffer_read[BUFSIZ];
 
     write_data(sock, file);
-    
+
     // // open the file and processed it
     // if((read_file = open(file, O_RDONLY)) < 0){
     //     perror("can't open file");
@@ -58,34 +57,36 @@ void send_d(int sock, char* file, int max_block){
     // }
 
     // while ( (write_to_client = read(read_file, buffer_read, max_block)) > 0 ){
-    //     printf(">> I'm in. Send the file to the client now!\n");
-    //     send(sock, buffer_read, write_to_client, 0);
+    //     printf(">> Send the file to the client now!\n");
+    //     write(sock, buffer_read, write_to_client);
     // }
+    printf("\t\tLE POYLEE\n\n");
     
-    // close(read_file);
-    printf("\t\tLE POYLEE\n\n", file);
-
+    //close(read_file);
+    pthread_mutex_unlock(&mtx_4);
 }
 
 /***************************************** worker thread ***********************************/
 //a
 void *worker_thread(void *arg){
     // printf("Just created a worker thread %ld\n", pthread_self());
-
+    pthread_mutex_lock(&mtx_2);
     struct thread_args *args = (struct thread_args *) arg;
     int size = args->s_size;
+    int socket;
 
     pthread_cond_wait(&cvar, &mtx_2); //* Wait for signal
     
     char* file;
+    socket = sock_copy;
+
     while (oyra.count > 0 || num_of_files > 0){
-        //strcpy(file, obtain(&oyra,size));
         file = obtain(&oyra,size);
         pthread_cond_signal(&cond_nonfull);
-
-        printf("{Thread %ld}: Received task: <%s, %d>\n", pthread_self(), file, args->f_socket);
-        send_d(args->f_socket, file, args->bl_size);
-
+        printf("{Thread %ld}: Received task: <%s, %d>\n", pthread_self(), file, socket);
+        pthread_mutex_lock(&mtx_4);
+        send_d(socket, file, args->bl_size);
+        pthread_mutex_unlock(&mtx_2);
     }
 
     printf(">> No more files to read. I don't know what to dooo now!:( \n");
@@ -113,6 +114,8 @@ int main(int argc, char *argv[]){
     initialize(&oyra);
     pthread_mutex_init(&mtx, 0);
     pthread_mutex_init(&mtx_2, 0);
+    pthread_mutex_init(&mtx_3, 0);
+    pthread_mutex_init(&mtx_4, 0);
     pthread_cond_init(&cond_nonempty, 0);
     pthread_cond_init(&cond_nonfull, 0);
 
@@ -147,7 +150,7 @@ int main(int argc, char *argv[]){
     signal(SIGCHLD, sigchld_handler);
     
     struct thread_args *args = malloc (sizeof (struct thread_args));
-    args->f_socket = newsock;
+    //args->f_socket = newsock;
     args->s_size = queue_size;
     args->bl_size = block_size;
 
@@ -161,8 +164,6 @@ int main(int argc, char *argv[]){
             perror2("pthread_create", err);
             exit(1);
         }
-        printf("Thread %ld: Created thread %ld\n", pthread_self(), worker_thr_id[i]);
-
     }
 
     /***************************************************************************************/
@@ -191,8 +192,7 @@ int main(int argc, char *argv[]){
         /************************* making the communication thread *************************/
         
         args->f_socket = newsock;
-        args->s_size = queue_size;
-        args->bl_size = block_size;
+        sock_copy = newsock;
 
         if ((err = pthread_create(&thr_com, NULL, communication_thread, args))){
             perror2("pthread_create", err);
@@ -201,7 +201,7 @@ int main(int argc, char *argv[]){
         //printf("Thread %ld: Created thread %ld\n", pthread_self(), thr_com);
 
     }
-    close(newsock); //closes socket to client
+    //close(newsock); //closes socket to client
 
     
     /***************************************************************************************/
@@ -221,6 +221,8 @@ int main(int argc, char *argv[]){
     pthread_cond_destroy(&cond_nonfull);
     pthread_mutex_destroy(&mtx);
     pthread_mutex_destroy(&mtx_2);
+    pthread_mutex_destroy(&mtx_3);
+    pthread_mutex_destroy(&mtx_4);
     
     return 0;
 }
