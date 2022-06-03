@@ -18,22 +18,14 @@
 
 /***************************************************************************************/
 
-int find_the_file(char* dir, char* file){
-    int fd;
+void find_the_file(char* dir, char* file){
     DIR *folder;
     struct dirent *entry;
     char new_folder[BUFF];
     folder = opendir(dir);
     // if the is no
     if(folder == NULL){
-        perror("Unable to read directory");
-    }
-    else{
-        fd = mkdir(dir,S_IRWXU);
-        folder = opendir(dir);
-        if(folder == NULL){
-            perror("Unable to read directory");
-        }
+        return;
     }
     if( (entry=readdir(folder))){
         if (entry->d_type == DT_DIR){
@@ -47,13 +39,12 @@ int find_the_file(char* dir, char* file){
                 if (remove(file) == 0) {
                     printf("The file is deleted successfully.");
                 } 
-                else {
+                else{
                     printf("The file is not deleted.");
                 }
             }
         }
     }
-    return fd;
 }
 
 /***********************************************************************/
