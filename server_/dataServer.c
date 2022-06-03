@@ -41,33 +41,8 @@ void *communication_thread(void *argp){
     return 0;
 }
 
-
-void send_d(int sock, char* file, int max_block){
-    printf("{Thread: %ld}: About to read file: %s\n", pthread_self(), file);
-
-    int read_file, write_to_client;
-    char buffer_read[BUFSIZ];
-
-    write_data(sock, file);
-
-    // // open the file and processed it
-    // if((read_file = open(file, O_RDONLY)) < 0){
-    //     perror("can't open file");
-    //     exit(EXIT_FAILURE);
-    // }
-
-    // while ( (write_to_client = read(read_file, buffer_read, max_block)) > 0 ){
-    //     printf(">> Send the file to the client now!\n");
-    //     write(sock, buffer_read, write_to_client);
-    // }
-    printf("\t\tLE POYLEE\n\n");
-    
-    //close(read_file);
-    pthread_mutex_unlock(&mtx_4);
-}
-
 /***************************************** worker thread ***********************************/
-//a
+
 void *worker_thread(void *arg){
     // printf("Just created a worker thread %ld\n", pthread_self());
     pthread_mutex_lock(&mtx_2);
@@ -75,7 +50,7 @@ void *worker_thread(void *arg){
     int size = args->s_size;
     int socket;
 
-    pthread_cond_wait(&cvar, &mtx_2); //* Wait for signal
+    pthread_cond_wait(&cvar, &mtx_2); // wait for signal
     
     char* file;
     socket = sock_copy;
@@ -90,6 +65,7 @@ void *worker_thread(void *arg){
     }
 
     printf(">> No more files to read. I don't know what to dooo now!:( \n");
+    close(args->f_socket);
     pthread_exit(0);
 }
 
@@ -201,8 +177,6 @@ int main(int argc, char *argv[]){
         //printf("Thread %ld: Created thread %ld\n", pthread_self(), thr_com);
 
     }
-    //close(newsock); //closes socket to client
-
     
     /***************************************************************************************/
     

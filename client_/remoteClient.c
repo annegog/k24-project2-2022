@@ -68,11 +68,9 @@ int main(int argc, char *argv[]){
     char* dir_to_make = "./Client";
     mkdir(dir_to_make,S_IRWXU);
 
-    int count = 0;
-    char dir[BUFF];
+    char new_file[BUFF];
 
     while(1){
-        count++;
 
         read_data(sock,buffer);
         char* file = separate(buffer);
@@ -83,22 +81,21 @@ int main(int argc, char *argv[]){
         // cheking if the file allready exists
         find_the_file(dir_to_make,file);
         
-        sprintf(dir, "%s/%s", dir_to_make, file);
+        sprintf(new_file, "%s/%s", dir_to_make, file);
         
         // create a file in the folder Client
         // so we copy the (server) file to client's file        
-        FILE *write_file = fopen(dir, "w+");
+        FILE *write_file = fopen(new_file, "w+");
         if ( write_file == NULL){   
             printf("Error! Could not open file\n"); 
             exit(EXIT_FAILURE); 
         }
-        while( (reading = read(sock, buffer_read, BUFF)) > 0){
-            printf("%s", buffer_read);
-            fprintf(write_file,"%s", buffer_read);
-        }
+        // while( (reading = read(sock, buffer_read, BUFF)) > 0){
+        //     printf("%s", buffer_read);
+        //     fprintf(write_file,"%s", buffer_read);
+        // }
   
-        fprintf(write_file,"skata... %d!", count);
-        //printf("out of the while recv\n");
+        fprintf(write_file,"Hi! I'm %s :( ..", file);
         
         fclose(write_file);
         

@@ -128,15 +128,18 @@ int place_the_files(char* file, pthread_t thread, int max_size){
     while( (entry=readdir(folder)) ){
         if (entry->d_type == DT_DIR){
             if( !(strcmp(entry->d_name,".") == 0 || strcmp(entry->d_name,"..") == 0) ){
-                sprintf(new_file, "%s/%s", file, entry->d_name );
+                sprintf(new_file, "%s/%s", file, entry->d_name);
                 place_the_files(new_file,thread,max_size);
             }
         }
         else if (entry->d_type == DT_REG){
             pthread_mutex_lock(&mtx_3);
-        
-            //sprintf(new_file, "%s/%s", file, entry->d_name);
-            
+            /* den exoyn kai to onoma toy folder, giati kati phgaine (polyy) 
+            lathos me to struct queue_t.. Kai kanoyn place sthn oyra namefiles
+            2-3 fores kai alla den kanoyn katholoy. Meta apo debugging katalaba 
+            oti ftaiei h sprtintf... kai de mporoysa na to ftiaksw!
+            */
+            //sprintf(new_file, "%s/%s", file_temp, entry->d_name);
             place(&oyra, entry->d_name, max_size);
             printf("[Thread %ld]: Adding file <%s> to the queue…\n", thread, entry->d_name);
             num_of_files--;
@@ -164,12 +167,33 @@ int write_data ( int fd, char* message ){/* Write formated data */
 
 /*******************************************************************************************/
 
+void send_d(int sock, char* file, int max_block){
+    printf("{Thread: %ld}: About to read file: %s\n", pthread_self(), file);
 
+    int read_file, write_to_client;
+    char buffer_read[BUFSIZ];
+    char skata[BUFF];
 
+    write_data(sock, file);
 
-
-
-
+    // PARADOXH!!!!!!!!
+    // ola ta arxeia einai sto idio folder...
+    sprintf(skata, "../server_folder/%s", file);
+    // open the file and processed it
+    if((read_file = open(skata, O_RDONLY)) < 0){
+        perror("can't open file");
+        exit(EXIT_FAILURE);
+    }
+    else{
+        // pthread_mutex_lock(&mtx_3);
+        // while ( (write_to_client = read(read_file, buffer_read, max_block)) > 0 ){
+        //     write(sock, buffer_read, write_to_client);
+        // }
+        // pthread_mutex_unlock(&mtx_3);
+    }
+    close(read_file);
+    pthread_mutex_unlock(&mtx_4);
+}
 
 /***************************************************************************************/
 

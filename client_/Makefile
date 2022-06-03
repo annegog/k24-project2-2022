@@ -11,7 +11,7 @@ HEADER = client.h
 EXEC = remoteClient
 
 # Παράμετροι για δοκιμαστική εκτέλεση
-ARGS = -i 192.168.1.5 -p 12502 -d ../../../../server
+ARGS = -i 192.168.1.5 -p 12501 -d ../server_folder
 
 $(EXEC): $(OBJS)
 	$(CC) $(OBJS) -o $(EXEC)
